@@ -185,18 +185,36 @@ class ClientTrader(IClientTrader):
         ).click()
         self.wait(0.2)
 
-        # 等待出现 确认兑换框
+        # 等待出现 确认弹框
         if self.is_exist_pop_dialog():
-            # 点击是 按钮
             w = self._app.top_window()
-            if w is not None:
-                btn = w["是(Y)"]
-                if btn is not None:
-                    btn.click()
-                    self.wait(0.2)
+            if w is not None and self._get_window_class_name(w) != "TopWndTips":
+                try:
+                    btn = w.child_window(best_match="是(Y)")
+                    if btn.exists(timeout=0.5):
+                        btn.click()
+                        self.wait(0.2)
+                except (
+                    findwindows.ElementNotFoundError,
+                    timings.TimeoutError,
+                    RuntimeError,
+                ):
+                    pass
 
         # 如果出现了确认窗口
         self.close_pop_dialog()
+
+    @staticmethod
+    def _get_window_class_name(window):
+        try:
+            return window.class_name()
+        except (
+            findwindows.ElementNotFoundError,
+            timings.TimeoutError,
+            RuntimeError,
+            AttributeError,
+        ):
+            return ""
 
     @perf_clock
     def repo(self, security, price, amount, **kwargs):
