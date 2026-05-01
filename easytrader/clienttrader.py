@@ -204,7 +204,10 @@ class ClientTrader(IClientTrader):
         if w is None:
             return
 
-        if self._get_window_class_name(w) != "#32770":
+        if self._is_main_window(w):
+            return
+
+        if self._get_window_class_name(w) == "TopWndTips":
             return
 
         try:
@@ -234,6 +237,21 @@ class ClientTrader(IClientTrader):
         except Exception as ex:
             if ex.__class__.__name__ == "InvalidWindowHandle":
                 return None
+            raise
+
+    def _is_main_window(self, window):
+        try:
+            return self._main.wrapper_object() == window.wrapper_object()
+        except (
+            findwindows.ElementNotFoundError,
+            timings.TimeoutError,
+            RuntimeError,
+            AttributeError,
+        ):
+            return False
+        except Exception as ex:
+            if ex.__class__.__name__ == "InvalidWindowHandle":
+                return False
             raise
 
     @staticmethod
