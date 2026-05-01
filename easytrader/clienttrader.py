@@ -5,6 +5,7 @@ import logging
 import os
 import re
 import sys
+import threading
 import time
 from typing import Type, Union
 
@@ -88,6 +89,7 @@ class ClientTrader(IClientTrader):
         self._app = None
         self._main = None
         self._toolbar = None
+        self._cancel_all_entrusts_lock = threading.Lock()
 
     @property
     def app(self):
@@ -176,33 +178,39 @@ class ClientTrader(IClientTrader):
         return {"message": "委托单状态错误不能撤单, 该委托单可能已经成交或者已撤"}
 
     def cancel_all_entrusts(self):
-        self.refresh()
-        self._switch_left_menus(["撤单[F3]"])
+        if not self._cancel_all_entrusts_lock.acquire(False):
+            return {"message": "全部撤单正在执行，请勿重复点击"}
 
-        # 点击全部撤销控件
-        self._app.top_window().child_window(
-            control_id=self._config.TRADE_CANCEL_ALL_ENTRUST_CONTROL_ID, class_name="Button", title_re="""全撤.*"""
-        ).click()
-        self.wait(0.2)
+        try:
+            self.refresh()
+            self._switch_left_menus(["撤单[F3]"])
 
-        # 等待出现 确认弹框
-        if self.is_exist_pop_dialog():
-            w = self._app.top_window()
-            if w is not None and self._get_window_class_name(w) != "TopWndTips":
-                try:
-                    btn = w.child_window(best_match="是(Y)")
-                    if btn.exists(timeout=0.5):
-                        btn.click()
-                        self.wait(0.2)
-                except (
-                    findwindows.ElementNotFoundError,
-                    timings.TimeoutError,
-                    RuntimeError,
-                ):
-                    pass
+            # 点击全部撤销控件
+            self._app.top_window().child_window(
+                control_id=self._config.TRADE_CANCEL_ALL_ENTRUST_CONTROL_ID, class_name="Button", title_re="""全撤.*"""
+            ).click()
+            self.wait(0.2)
 
-        # 如果出现了确认窗口
-        self.close_pop_dialog()
+            # 等待出现 确认弹框
+            if self.is_exist_pop_dialog():
+                w = self._app.top_window()
+                if w is not None and self._get_window_class_name(w) != "TopWndTips":
+                    try:
+                        btn = w.child_window(best_match="是(Y)")
+                        if btn.exists(timeout=0.5):
+                            btn.click()
+                            self.wait(0.2)
+                    except (
+                        findwindows.ElementNotFoundError,
+                        timings.TimeoutError,
+                        RuntimeError,
+                    ):
+                        pass
+
+            # 如果出现了确认窗口
+            # self.close_pop_dialog()
+        finally:
+            self._cancel_all_entrusts_lock.release()
 
     @staticmethod
     def _get_window_class_name(window):
