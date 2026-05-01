@@ -191,26 +191,50 @@ class ClientTrader(IClientTrader):
             ).click()
             self.wait(0.2)
 
-            # 等待出现 确认弹框
-            if self.is_exist_pop_dialog():
-                w = self._app.top_window()
-                if w is not None and self._get_window_class_name(w) != "TopWndTips":
-                    try:
-                        btn = w.child_window(best_match="是(Y)")
-                        if btn.exists(timeout=0.5):
-                            btn.click()
-                            self.wait(0.2)
-                    except (
-                        findwindows.ElementNotFoundError,
-                        timings.TimeoutError,
-                        RuntimeError,
-                    ):
-                        pass
+            self._confirm_cancel_all_entrusts()
 
             # 如果出现了确认窗口
             # self.close_pop_dialog()
         finally:
             self._cancel_all_entrusts_lock.release()
+
+    def _confirm_cancel_all_entrusts(self):
+        self.wait(0.5)
+        w = self._get_top_window()
+        if w is None:
+            return
+
+        if self._get_window_class_name(w) != "#32770":
+            return
+
+        try:
+            btn = w.child_window(best_match="是(Y)")
+            if btn.exists(timeout=0.5):
+                btn.click()
+                self.wait(0.2)
+        except (
+            findwindows.ElementNotFoundError,
+            timings.TimeoutError,
+            RuntimeError,
+        ):
+            pass
+        except Exception as ex:
+            if ex.__class__.__name__ != "InvalidWindowHandle":
+                raise
+
+    def _get_top_window(self):
+        try:
+            return self._app.top_window()
+        except (
+            findwindows.ElementNotFoundError,
+            timings.TimeoutError,
+            RuntimeError,
+        ):
+            return None
+        except Exception as ex:
+            if ex.__class__.__name__ == "InvalidWindowHandle":
+                return None
+            raise
 
     @staticmethod
     def _get_window_class_name(window):
@@ -223,6 +247,10 @@ class ClientTrader(IClientTrader):
             AttributeError,
         ):
             return ""
+        except Exception as ex:
+            if ex.__class__.__name__ == "InvalidWindowHandle":
+                return ""
+            raise
 
     @perf_clock
     def repo(self, security, price, amount, **kwargs):
